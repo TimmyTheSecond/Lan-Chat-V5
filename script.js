@@ -1,6 +1,6 @@
-console.log("Multi-Channel Chat Loaded! V22 - Full Ably Chat SDK");
+console.log("Multi-Channel Chat Loaded! V23 - Ably Chat Fixed");
 
-// ==================== CONFIG ====================
+// ==================== SENSITIVE CONFIG ====================
 const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg";
 
 const channelPasswords = {
@@ -8,14 +8,19 @@ const channelPasswords = {
     "private-2": "yeah200"
 };
 
-// Variables
+// ==================== VARIABLES ====================
 let username = localStorage.getItem("username") || "Guest" + Math.floor(Math.random() * 1000);
 localStorage.setItem("username", username);
 
 let currentChannelName = "public-chat";
+let realtime = null;
 let chatClient = null;
 let currentRoom = null;
-let systemRoom = null;   // For lock using Live Objects
+let systemRoom = null;
+
+// Lock state
+let globalLocked = false;
+let lockMessage = "Under maintenance";
 
 // DOM
 const chatEl = document.getElementById("chat");
@@ -26,19 +31,20 @@ const nameBtn = document.getElementById("nameBtn");
 const imageBtn = document.getElementById("imageBtn");
 const imageUpload = document.getElementById("imageUpload");
 
-// Lock state
-let globalLocked = false;
-let lockMessage = "Under maintenance";
-
-// Initialize Ably Chat
+// ==================== INITIALIZE ABLY CHAT ====================
 async function init() {
-    const realtime = new Ably.Realtime({ key: ABLY_API_KEY, clientId: username });
-    chatClient = new ChatClient(realtime);
+    realtime = new Ably.Realtime({ 
+        key: ABLY_API_KEY, 
+        clientId: username 
+    });
+
+    // Correct Ably Chat initialization
+    chatClient = new Ably.Chat(realtime);
 
     // Join main chat room
     await joinChatRoom(currentChannelName);
 
-    // Join system control room for lock
+    // System room for lock commands
     systemRoom = await chatClient.rooms.get("system-control");
     await systemRoom.attach();
 
@@ -56,35 +62,22 @@ async function joinChatRoom(roomName) {
     currentRoom.messages.subscribe((msg) => {
         addMessage(msg);
     });
-
-    // Presence (online)
-    currentRoom.presence.subscribe(() => {
-        // You can show online list here if you want
-    });
-
-    // Typing indicators
-    currentRoom.typing.subscribe((typing) => {
-        console.log("Typing:", typing);
-    });
-
-    // Reactions
-    currentRoom.reactions.subscribe((reaction) => {
-        console.log("Reaction received:", reaction);
-    });
 }
 
 function addMessage(msg) {
     const div = document.createElement("div");
     div.classList.add("message");
     div.innerHTML = `<strong>${msg.clientId}:</strong> ${msg.text || ""}`;
+    
     if (msg.attachment) {
-        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%;border-radius:8px;">`;
+        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%; border-radius:8px; margin-top:8px;">`;
     }
+
     chatEl.appendChild(div);
     chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-// ==================== COMMANDS & LOCK (Live Object style) ====================
+// ==================== COMMANDS & LOCK ====================
 function handleCommand(cmd) {
     if (cmd === '!cmds') {
         console.log("%c📋 Commands:\n" +
@@ -101,7 +94,8 @@ function handleCommand(cmd) {
         lockMessage = "Under maintenance";
         broadcastLock();
         updateLockUI();
-    } else if (cmd.startsWith('!lockmessage ')) {
+    } 
+    else if (cmd.startsWith('!lockmessage ')) {
         const msg = cmd.substring(13).trim();
         if (msg) {
             globalLocked = true;
@@ -109,7 +103,8 @@ function handleCommand(cmd) {
             broadcastLock();
             updateLockUI();
         }
-    } else if (cmd === '!unlock') {
+    } 
+    else if (cmd === '!unlock') {
         globalLocked = false;
         broadcastLock();
         updateLockUI();
@@ -151,7 +146,7 @@ async function sendTextMessage() {
     const text = messageInput.value.trim();
     if (!text) return;
 
-    await currentRoom.messages.send({ text });
+    await currentRoom.messages.send({ text: text });
     messageInput.value = "";
 }
 
@@ -196,8 +191,8 @@ function switchChannel(newChannel) {
     if (newChannel === currentChannelName) return;
 
     if (channelPasswords[newChannel]) {
-        const pass = prompt("Enter password:");
-        if (pass !== channelPasswords[newChannel]) {
+        const entered = prompt("Enter password for this channel:");
+        if (entered !== channelPasswords[newChannel]) {
             alert("Wrong password.");
             return;
         }
@@ -207,6 +202,6 @@ function switchChannel(newChannel) {
     joinChatRoom(newChannel);
 }
 
-// Initial load
+// ==================== START ====================
 document.getElementById("loadingScreen").style.display = "flex";
 init();

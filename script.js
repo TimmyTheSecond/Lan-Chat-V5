@@ -1,7 +1,7 @@
-console.log("Multi-Channel Chat Loaded! V23 - Ably Chat SDK FIXED");
+console.log("Multi-Channel Chat Loaded! V25 - Fixed systemRoom.subscribe error");
 
-// ==================== CONFIG ====================
-const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg"; 
+// ==================== SENSITIVE CONFIG ====================
+const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg";
 
 const channelPasswords = {
     "private-1": "smart456",
@@ -13,9 +13,14 @@ let username = localStorage.getItem("username") || "Guest" + Math.floor(Math.ran
 localStorage.setItem("username", username);
 
 let currentChannelName = "public-chat";
+let realtime = null;
 let chatClient = null;
 let currentRoom = null;
 let systemRoom = null;
+
+// Lock state
+let globalLocked = false;
+let lockMessage = "Under maintenance";
 
 // DOM
 const chatEl = document.getElementById("chat");
@@ -26,178 +31,70 @@ const nameBtn = document.getElementById("nameBtn");
 const imageBtn = document.getElementById("imageBtn");
 const imageUpload = document.getElementById("imageUpload");
 
-// Lock state
-let globalLocked = false;
-let lockMessage = "Under maintenance";
-
-// ==================== INIT ====================
+// ==================== INITIALIZE ====================
 async function init() {
-    try {
-        const realtime = new Ably.Realtime({
-            key: ABLY_API_KEY,
-            clientId: username
-        });
+    realtime = new Ably.Realtime({ 
+        key: ABLY_API_KEY, 
+        clientId: username 
+    });
 
-        // ✅ FIX: use AblyChat
-        chatClient = new AblyChat.ChatClient(realtime);
+    chatClient = new Ably.Chat(realtime);
 
-        // Wait for connection
-        realtime.connection.once("connected", () => {
-            console.log("✅ Connected to Ably");
-        });
+    await joinChatRoom(currentChannelName);
 
-        // Join rooms
-        await joinChatRoom(currentChannelName);
+    // System room for lock commands
+    systemRoom = await chatClient.rooms.get("system-control");
+    await systemRoom.attach();
 
-        systemRoom = await chatClient.rooms.get("system-control");
-        await systemRoom.attach();
-
-        // Listen for lock updates
-        systemRoom.subscribe("lockUpdate", (msg) => {
-            globalLocked = msg.data.globalLocked;
-            lockMessage = msg.data.lockMessage;
+    // Listen for lock updates using correct method
+    systemRoom.messages.subscribe((msg) => {
+        if (msg.name === "lockUpdate") {
+            const data = msg.data;
+            globalLocked = data.globalLocked;
+            if (data.lockMessage) lockMessage = data.lockMessage;
             updateLockUI();
-        });
-
-        document.getElementById("loadingScreen").style.display = "none";
-
-        console.log("✅ Ably Chat fully initialized");
-    } catch (err) {
-        console.error("❌ Init error:", err);
-    }
-}
-
-// ==================== JOIN ROOM ====================
-async function joinChatRoom(roomName) {
-    try {
-        if (currentRoom) {
-            await currentRoom.detach();
         }
+    });
 
-        currentRoom = await chatClient.rooms.get(roomName);
-        await currentRoom.attach();
-
-        chatEl.innerHTML = "";
-
-        // ✅ Messages
-        currentRoom.messages.subscribe((msg) => {
-            addMessage(msg);
-        });
-
-        // Typing
-        currentRoom.typing.subscribe((typing) => {
-            console.log("Typing:", typing);
-        });
-
-        // Reactions
-        currentRoom.reactions.subscribe((reaction) => {
-            console.log("Reaction:", reaction);
-        });
-
-        console.log("✅ Joined room:", roomName);
-    } catch (err) {
-        console.error("❌ Room join error:", err);
-    }
+    console.log("✅ Ably Chat initialized successfully");
 }
 
-// ==================== ADD MESSAGE ====================
+async function joinChatRoom(roomName) {
+    if (currentRoom) await currentRoom.detach();
+
+    currentRoom = await chatClient.rooms.get(roomName);
+    await currentRoom.attach();
+
+    currentRoom.messages.subscribe((msg) => {
+        addMessage(msg);
+    });
+}
+
 function addMessage(msg) {
     const div = document.createElement("div");
     div.classList.add("message");
-
-    const text = msg.text || msg.data?.text || "";
-    const attachment = msg.attachment || msg.data?.attachment;
-
-    div.innerHTML = `<strong>${msg.clientId}:</strong> ${text}`;
-
-    if (attachment?.url) {
-        div.innerHTML += `<br><img src="${attachment.url}" style="max-width:100%;border-radius:8px;">`;
+    div.innerHTML = `<strong>${msg.clientId}:</strong> ${msg.text || ""}`;
+    
+    if (msg.attachment) {
+        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%; border-radius:8px; margin-top:8px;">`;
     }
 
     chatEl.appendChild(div);
     chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-// ==================== SEND MESSAGE ====================
-sendBtn.addEventListener("click", sendTextMessage);
-messageInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendTextMessage();
-});
-
-async function sendTextMessage() {
-    if (!currentRoom || globalLocked) return;
-
-    const text = messageInput.value.trim();
-    if (!text) return;
-
-    try {
-        await currentRoom.messages.send({ text });
-        messageInput.value = "";
-    } catch (err) {
-        console.error("❌ Send error:", err);
-    }
-}
-
-// ==================== IMAGE ====================
-imageBtn.addEventListener("click", () => imageUpload.click());
-
-imageUpload.addEventListener("change", async () => {
-    const file = imageUpload.files[0];
-    if (!file || !currentRoom || globalLocked) return;
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-        try {
-            await currentRoom.messages.send({
-                attachment: {
-                    url: reader.result,
-                    name: file.name,
-                    type: file.type
-                }
-            });
-        } catch (err) {
-            console.error("❌ Image send error:", err);
-        }
-    };
-    reader.readAsDataURL(file);
-});
-
-// ==================== NAME ====================
-nameBtn.addEventListener("click", changeName);
-nameInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") changeName();
-});
-
-function changeName() {
-    const newName = nameInput.value.trim();
-    if (!newName) return;
-
-    username = newName;
-    localStorage.setItem("username", username);
-
-    alert("Name changed! Refresh to apply.");
-    nameInput.value = "";
-}
-
-// ==================== CHANNEL SWITCH ====================
-function switchChannel(newChannel) {
-    if (globalLocked) return;
-    if (newChannel === currentChannelName) return;
-
-    if (channelPasswords[newChannel]) {
-        const pass = prompt("Enter password:");
-        if (pass !== channelPasswords[newChannel]) {
-            alert("Wrong password.");
-            return;
-        }
-    }
-
-    currentChannelName = newChannel;
-    joinChatRoom(newChannel);
-}
-
-// ==================== LOCK SYSTEM ====================
+// ==================== COMMANDS & LOCK ====================
 function handleCommand(cmd) {
+    if (cmd === '!cmds') {
+        console.log("%c📋 Commands:\n" +
+                    "cmd('!cmds')\n" +
+                    "cmd('!lock')\n" +
+                    "cmd('!lockmessage Your message')\n" +
+                    "cmd('!unlock')",
+                    "color:#3b82f6; font-family:monospace");
+        return;
+    }
+
     if (cmd === '!lock') {
         globalLocked = true;
         lockMessage = "Under maintenance";
@@ -221,12 +118,15 @@ function handleCommand(cmd) {
 }
 
 function broadcastLock() {
-    if (!systemRoom) return;
-
-    systemRoom.publish("lockUpdate", {
-        globalLocked,
-        lockMessage
-    });
+    if (systemRoom) {
+        systemRoom.messages.send({
+            name: "lockUpdate",
+            data: {
+                globalLocked: globalLocked,
+                lockMessage: lockMessage
+            }
+        });
+    }
 }
 
 function updateLockUI() {
@@ -244,5 +144,73 @@ function updateLockUI() {
     }
 }
 
-// ==================== START ====================
+// ==================== SEND MESSAGE ====================
+sendBtn.addEventListener("click", sendTextMessage);
+messageInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendTextMessage();
+});
+
+async function sendTextMessage() {
+    if (!currentRoom) return;
+    const text = messageInput.value.trim();
+    if (!text) return;
+
+    await currentRoom.messages.send({ text: text });
+    messageInput.value = "";
+}
+
+// Image sharing
+imageBtn.addEventListener("click", () => imageUpload.click());
+imageUpload.addEventListener("change", async () => {
+    const file = imageUpload.files[0];
+    if (!file || !currentRoom) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+        await currentRoom.messages.send({
+            attachment: {
+                url: reader.result,
+                name: file.name,
+                type: file.type
+            }
+        });
+    };
+    reader.readAsDataURL(file);
+});
+
+// Name change
+nameBtn.addEventListener("click", changeName);
+nameInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") changeName();
+});
+
+function changeName() {
+    const newName = nameInput.value.trim();
+    if (newName) {
+        username = newName;
+        localStorage.setItem("username", username);
+        alert("Name changed to " + username);
+        nameInput.value = "";
+    }
+}
+
+// Switch channel
+function switchChannel(newChannel) {
+    if (globalLocked) return;
+    if (newChannel === currentChannelName) return;
+
+    if (channelPasswords[newChannel]) {
+        const entered = prompt("Enter password for this channel:");
+        if (entered !== channelPasswords[newChannel]) {
+            alert("Wrong password.");
+            return;
+        }
+    }
+
+    currentChannelName = newChannel;
+    joinChatRoom(newChannel);
+}
+
+// Start
+document.getElementById("loadingScreen").style.display = "flex";
 init();

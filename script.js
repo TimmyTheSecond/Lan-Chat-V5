@@ -1,6 +1,5 @@
-console.log("Multi-Channel Chat Loaded! V23 - Ably Chat Fixed");
+console.log("Multi-Channel Chat Loaded! V24 - Ably Chat Fixed");
 
-// ==================== SENSITIVE CONFIG ====================
 const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg";
 
 const channelPasswords = {
@@ -8,7 +7,6 @@ const channelPasswords = {
     "private-2": "yeah200"
 };
 
-// ==================== VARIABLES ====================
 let username = localStorage.getItem("username") || "Guest" + Math.floor(Math.random() * 1000);
 localStorage.setItem("username", username);
 
@@ -18,7 +16,6 @@ let chatClient = null;
 let currentRoom = null;
 let systemRoom = null;
 
-// Lock state
 let globalLocked = false;
 let lockMessage = "Under maintenance";
 
@@ -31,34 +28,28 @@ const nameBtn = document.getElementById("nameBtn");
 const imageBtn = document.getElementById("imageBtn");
 const imageUpload = document.getElementById("imageUpload");
 
-// ==================== INITIALIZE ABLY CHAT ====================
 async function init() {
     realtime = new Ably.Realtime({ 
         key: ABLY_API_KEY, 
         clientId: username 
     });
 
-    // Correct Ably Chat initialization
     chatClient = new Ably.Chat(realtime);
 
-    // Join main chat room
     await joinChatRoom(currentChannelName);
 
-    // System room for lock commands
     systemRoom = await chatClient.rooms.get("system-control");
     await systemRoom.attach();
 
-    console.log("✅ Ably Chat fully initialized");
+    console.log("✅ Ably Chat initialized successfully");
 }
 
-// Join a chat room
 async function joinChatRoom(roomName) {
     if (currentRoom) await currentRoom.detach();
 
     currentRoom = await chatClient.rooms.get(roomName);
     await currentRoom.attach();
 
-    // Messages
     currentRoom.messages.subscribe((msg) => {
         addMessage(msg);
     });
@@ -77,13 +68,13 @@ function addMessage(msg) {
     chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-// ==================== COMMANDS & LOCK ====================
+// Commands
 function handleCommand(cmd) {
     if (cmd === '!cmds') {
         console.log("%c📋 Commands:\n" +
                     "cmd('!cmds')\n" +
                     "cmd('!lock')\n" +
-                    "cmd('!lockmessage Your message here')\n" +
+                    "cmd('!lockmessage Your message')\n" +
                     "cmd('!unlock')",
                     "color:#3b82f6; font-family:monospace");
         return;
@@ -135,7 +126,7 @@ function updateLockUI() {
     }
 }
 
-// ==================== SEND MESSAGE ====================
+// Send text
 sendBtn.addEventListener("click", sendTextMessage);
 messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendTextMessage();
@@ -150,7 +141,7 @@ async function sendTextMessage() {
     messageInput.value = "";
 }
 
-// Image sharing
+// Image upload
 imageBtn.addEventListener("click", () => imageUpload.click());
 imageUpload.addEventListener("change", async () => {
     const file = imageUpload.files[0];
@@ -202,6 +193,6 @@ function switchChannel(newChannel) {
     joinChatRoom(newChannel);
 }
 
-// ==================== START ====================
+// Start
 document.getElementById("loadingScreen").style.display = "flex";
 init();

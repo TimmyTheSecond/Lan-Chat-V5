@@ -38,7 +38,7 @@ async function init() {
         clientId: username 
     });
 
-    chatClient = new Ably.Chat(realtime);
+    chatClient = new AblyChat.ChatClient(realtime);
 
     await joinChatRoom(currentChannelName);
 

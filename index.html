@@ -6,10 +6,14 @@
     <title>Lan-Chat Web</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- Ably Realtime -->
-    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
-    <!-- Ably Chat SDK -->
-    <script src="https://cdn.ably.com/lib/ably-chat.min.js"></script>
+    <!-- ✅ Load Ably FIRST -->
+    <script src="https://cdn.ably.com/lib/ably.min-1.js" defer></script>
+
+    <!-- ✅ Then Chat SDK -->
+    <script src="https://cdn.ably.com/lib/ably-chat/latest/ably-chat.min.js" defer></script>
+
+    <!-- ✅ Then your script -->
+    <script src="script.js" defer></script>
 </head>
 <body>
 
@@ -42,6 +46,5 @@
         <button data-channel="private-2" onclick="switchChannel('private-2')">Private 2</button>
     </div>
 
-    <script src="script.js"></script>
 </body>
 </html>

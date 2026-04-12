@@ -33,7 +33,7 @@ let lockMessage = "Under maintenance";
 // Initialize Ably Chat
 async function init() {
     const realtime = new Ably.Realtime({ key: ABLY_API_KEY, clientId: username });
-    chatClient = new ChatClient(realtime);
+    const chatClient = new ChatClient(realtime);
 
     // Join main chat room
     await joinChatRoom(currentChannelName);

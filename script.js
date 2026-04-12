@@ -1,5 +1,6 @@
-console.log("Multi-Channel Chat Loaded! V24 - Ably Chat Fixed");
+console.log("Multi-Channel Chat Loaded! V22 - Full Ably Chat SDK");
 
+// ==================== CONFIG ====================
 const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg";
 
 const channelPasswords = {
@@ -7,17 +8,14 @@ const channelPasswords = {
     "private-2": "yeah200"
 };
 
+// Variables
 let username = localStorage.getItem("username") || "Guest" + Math.floor(Math.random() * 1000);
 localStorage.setItem("username", username);
 
 let currentChannelName = "public-chat";
-let realtime = null;
 let chatClient = null;
 let currentRoom = null;
-let systemRoom = null;
-
-let globalLocked = false;
-let lockMessage = "Under maintenance";
+let systemRoom = null;   // For lock using Live Objects
 
 // DOM
 const chatEl = document.getElementById("chat");
@@ -28,30 +26,50 @@ const nameBtn = document.getElementById("nameBtn");
 const imageBtn = document.getElementById("imageBtn");
 const imageUpload = document.getElementById("imageUpload");
 
+// Lock state
+let globalLocked = false;
+let lockMessage = "Under maintenance";
+
+// Initialize Ably Chat
 async function init() {
-    realtime = new Ably.Realtime({ 
-        key: ABLY_API_KEY, 
-        clientId: username 
-    });
+    const realtime = new Ably.Realtime({ key: ABLY_API_KEY, clientId: username });
+    chatClient = new ChatClient(realtime);
 
-    chatClient = new Ably.Chat(realtime);
-
+    // Join main chat room
     await joinChatRoom(currentChannelName);
 
+    // Join system control room for lock
     systemRoom = await chatClient.rooms.get("system-control");
     await systemRoom.attach();
 
-    console.log("✅ Ably Chat initialized successfully");
+    console.log("✅ Ably Chat fully initialized");
 }
 
+// Join a chat room
 async function joinChatRoom(roomName) {
     if (currentRoom) await currentRoom.detach();
 
     currentRoom = await chatClient.rooms.get(roomName);
     await currentRoom.attach();
 
+    // Messages
     currentRoom.messages.subscribe((msg) => {
         addMessage(msg);
+    });
+
+    // Presence (online)
+    currentRoom.presence.subscribe(() => {
+        // You can show online list here if you want
+    });
+
+    // Typing indicators
+    currentRoom.typing.subscribe((typing) => {
+        console.log("Typing:", typing);
+    });
+
+    // Reactions
+    currentRoom.reactions.subscribe((reaction) => {
+        console.log("Reaction received:", reaction);
     });
 }
 
@@ -59,22 +77,20 @@ function addMessage(msg) {
     const div = document.createElement("div");
     div.classList.add("message");
     div.innerHTML = `<strong>${msg.clientId}:</strong> ${msg.text || ""}`;
-    
     if (msg.attachment) {
-        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%; border-radius:8px; margin-top:8px;">`;
+        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%;border-radius:8px;">`;
     }
-
     chatEl.appendChild(div);
     chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-// Commands
+// ==================== COMMANDS & LOCK (Live Object style) ====================
 function handleCommand(cmd) {
     if (cmd === '!cmds') {
         console.log("%c📋 Commands:\n" +
                     "cmd('!cmds')\n" +
                     "cmd('!lock')\n" +
-                    "cmd('!lockmessage Your message')\n" +
+                    "cmd('!lockmessage Your message here')\n" +
                     "cmd('!unlock')",
                     "color:#3b82f6; font-family:monospace");
         return;
@@ -85,8 +101,7 @@ function handleCommand(cmd) {
         lockMessage = "Under maintenance";
         broadcastLock();
         updateLockUI();
-    } 
-    else if (cmd.startsWith('!lockmessage ')) {
+    } else if (cmd.startsWith('!lockmessage ')) {
         const msg = cmd.substring(13).trim();
         if (msg) {
             globalLocked = true;
@@ -94,8 +109,7 @@ function handleCommand(cmd) {
             broadcastLock();
             updateLockUI();
         }
-    } 
-    else if (cmd === '!unlock') {
+    } else if (cmd === '!unlock') {
         globalLocked = false;
         broadcastLock();
         updateLockUI();
@@ -126,7 +140,7 @@ function updateLockUI() {
     }
 }
 
-// Send text
+// ==================== SEND MESSAGE ====================
 sendBtn.addEventListener("click", sendTextMessage);
 messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendTextMessage();
@@ -137,11 +151,11 @@ async function sendTextMessage() {
     const text = messageInput.value.trim();
     if (!text) return;
 
-    await currentRoom.messages.send({ text: text });
+    await currentRoom.messages.send({ text });
     messageInput.value = "";
 }
 
-// Image upload
+// Image sharing
 imageBtn.addEventListener("click", () => imageUpload.click());
 imageUpload.addEventListener("change", async () => {
     const file = imageUpload.files[0];
@@ -182,8 +196,8 @@ function switchChannel(newChannel) {
     if (newChannel === currentChannelName) return;
 
     if (channelPasswords[newChannel]) {
-        const entered = prompt("Enter password for this channel:");
-        if (entered !== channelPasswords[newChannel]) {
+        const pass = prompt("Enter password:");
+        if (pass !== channelPasswords[newChannel]) {
             alert("Wrong password.");
             return;
         }
@@ -193,6 +207,6 @@ function switchChannel(newChannel) {
     joinChatRoom(newChannel);
 }
 
-// Start
+// Initial load
 document.getElementById("loadingScreen").style.display = "flex";
 init();

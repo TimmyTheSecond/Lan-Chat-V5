@@ -1,6 +1,7 @@
-console.log("Multi-Channel Chat Loaded! V25 - Fixed systemRoom.subscribe error");
+<script>
+// Multi-Channel Chat V26 - Fixed loading + image sending + clean start
+console.log("Multi-Channel Chat Loaded! V26 - Loading + Image + Clean start");
 
-// ==================== SENSITIVE CONFIG ====================
 const ABLY_API_KEY = "75TknQ.C5wjCA:__3VQaPjaBwnTHpXhXT67kXBHkESR_2ixoRZJhYXQFg";
 
 const channelPasswords = {
@@ -41,12 +42,13 @@ async function init() {
     chatClient = new AblyChat.ChatClient(realtime);
 
     await joinChatRoom(currentChannelName);
+    console.log(`✅ Joined room: ${currentChannelName}`);
 
     // System room for lock commands
     systemRoom = await chatClient.rooms.get("system-control");
     await systemRoom.attach();
 
-    // Listen for lock updates using correct method
+    // Listen for lock updates
     systemRoom.messages.subscribe((msg) => {
         if (msg.name === "lockUpdate") {
             const data = msg.data;
@@ -56,7 +58,7 @@ async function init() {
         }
     });
 
-    console.log("✅ Ably Chat initialized successfully");
+    console.log("✅ Ably Chat + Live Sync initialized successfully");
 }
 
 async function joinChatRoom(roomName) {
@@ -73,12 +75,14 @@ async function joinChatRoom(roomName) {
 function addMessage(msg) {
     const div = document.createElement("div");
     div.classList.add("message");
-    div.innerHTML = `<strong>${msg.clientId}:</strong> ${msg.text || ""}`;
-    
+
+    let html = `<strong>${msg.clientId}:</strong> `;
+    if (msg.text) html += msg.text + " ";
     if (msg.attachment) {
-        div.innerHTML += `<br><img src="${msg.attachment.url}" style="max-width:100%; border-radius:8px; margin-top:8px;">`;
+        html += `<br><img src="${msg.attachment.url}" style="max-width:100%; border-radius:8px; margin-top:8px;">`;
     }
 
+    div.innerHTML = html;
     chatEl.appendChild(div);
     chatEl.scrollTop = chatEl.scrollHeight;
 }
@@ -159,7 +163,7 @@ async function sendTextMessage() {
     messageInput.value = "";
 }
 
-// Image sharing
+// Image sharing - FIXED: always include text so Ably doesn't throw 400 error
 imageBtn.addEventListener("click", () => imageUpload.click());
 imageUpload.addEventListener("change", async () => {
     const file = imageUpload.files[0];
@@ -168,6 +172,7 @@ imageUpload.addEventListener("change", async () => {
     const reader = new FileReader();
     reader.onload = async () => {
         await currentRoom.messages.send({
+            text: "📸",                                      // ← required by Ably Chat
             attachment: {
                 url: reader.result,
                 name: file.name,
@@ -176,6 +181,7 @@ imageUpload.addEventListener("change", async () => {
         });
     };
     reader.readAsDataURL(file);
+    imageUpload.value = "";   // reset so same file can be re-selected
 });
 
 // Name change
@@ -211,27 +217,28 @@ function switchChannel(newChannel) {
     joinChatRoom(newChannel);
 }
 
-// ==================== START APP ====================
+// ==================== START APP (clean + awaited) ====================
 async function startApp() {
     const loadingScreen = document.getElementById("loadingScreen");
     
-    // Show loading immediately
-    loadingScreen.style.display = "flex";
+    loadingScreen.style.display = "flex";   // show immediately
 
     try {
-        await init();                    // ← wait for everything to finish
-        console.log("Multi-Channel Chat Loaded! V25 - Fixed systemRoom.subscribe error");
-
-        // Hide loading screen once everything is ready
-        loadingScreen.style.display = "none";
+        await init();   // ← everything now properly awaited
+        console.log("✅ Multi-Channel Chat + Ably Live Sync ready (V26)");
+        loadingScreen.style.display = "none";   // ← loading screen disappears here
 
     } catch (error) {
         console.error("❌ Failed to initialize chat:", error);
-        // Optional: show an error message on the loading screen instead of hiding it
-        const loadingText = loadingScreen.querySelector("p") || loadingScreen;
-        if (loadingText) loadingText.innerHTML = `Error starting chat:<br>${error.message}<br><br>Refresh the page to try again.`;
+        loadingScreen.innerHTML = `
+            <div style="color:#ef4444; text-align:center; padding:20px; font-size:18px;">
+                Error starting chat:<br>
+                ${error.message}<br><br>
+                Refresh the page to try again.
+            </div>`;
     }
 }
 
-// Kick it off
+// Kick it off (only once)
 startApp();
+</script>

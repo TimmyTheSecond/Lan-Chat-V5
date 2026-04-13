@@ -211,6 +211,27 @@ function switchChannel(newChannel) {
     joinChatRoom(newChannel);
 }
 
-// Start
-document.getElementById("loadingScreen").style.display = "flex";
-init();
+// ==================== START APP ====================
+async function startApp() {
+    const loadingScreen = document.getElementById("loadingScreen");
+    
+    // Show loading immediately
+    loadingScreen.style.display = "flex";
+
+    try {
+        await init();                    // ← wait for everything to finish
+        console.log("Multi-Channel Chat Loaded! V25 - Fixed systemRoom.subscribe error");
+
+        // Hide loading screen once everything is ready
+        loadingScreen.style.display = "none";
+
+    } catch (error) {
+        console.error("❌ Failed to initialize chat:", error);
+        // Optional: show an error message on the loading screen instead of hiding it
+        const loadingText = loadingScreen.querySelector("p") || loadingScreen;
+        if (loadingText) loadingText.innerHTML = `Error starting chat:<br>${error.message}<br><br>Refresh the page to try again.`;
+    }
+}
+
+// Kick it off
+startApp();

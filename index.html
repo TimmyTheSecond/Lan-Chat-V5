@@ -8,9 +8,8 @@
     
     <!-- ✅ Load Ably FIRST -->
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    
     <script src="https://cdn.ably.com/lib/ably-chat.umd.cjs-0.js"></script>
-    <!-- ✅ LiveObjects for unique usernames (state sync) -->
-    <script src="https://cdn.ably.com/lib/objects.umd.min-2.js"></script>
 
     <!-- ✅ Then your script -->
     <script src="script.js" defer></script>
@@ -24,34 +23,26 @@
         <p id="lockMessage">Under maintenance</p>
     </div>
 
+    <div class="chat-container" id="chatContainer">
+        <div id="chat"></div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type your message..." />
+            <button id="sendBtn">Send</button>
+            <input type="file" id="imageUpload" accept="image/*" style="display:none">
+            <button id="imageBtn">📸</button>
+        </div>
+
+        <div class="name-area">
+            <input type="text" id="nameInput" placeholder="Change name..." />
+            <button id="nameBtn">Change</button>
+        </div>
+    </div>
+
     <div id="channels">
         <button data-channel="public-chat" onclick="switchChannel('public-chat')">Public</button>
         <button data-channel="private-1" onclick="switchChannel('private-1')">Private 1</button>
         <button data-channel="private-2" onclick="switchChannel('private-2')">Private 2</button>
-    </div>
-
-    <div class="main-content">
-        <div class="chat-container" id="chatContainer">
-            <div id="chat"></div>
-
-            <div class="input-area">
-                <input type="text" id="messageInput" placeholder="Type your message..." />
-                <button id="sendBtn">Send</button>
-                <input type="file" id="imageUpload" accept="image/*" style="display:none">
-                <button id="imageBtn">📸</button>
-            </div>
-
-            <div class="name-area">
-                <input type="text" id="nameInput" placeholder="Change name..." />
-                <button id="nameBtn">Change</button>
-            </div>
-        </div>
-
-        <!-- ✅ New sidebar - Who's Online -->
-        <div id="sidebar">
-            <h3>Online in <span id="currentChannelDisplay">Public</span></h3>
-            <ul id="onlineList"></ul>
-        </div>
     </div>
 
 </body>

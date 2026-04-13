@@ -1,4 +1,4 @@
-<script>
+
 // Multi-Channel Chat V26 - Fixed loading + image sending + clean start
 console.log("Multi-Channel Chat Loaded! V26 - Loading + Image + Clean start");
 
@@ -241,4 +241,4 @@ async function startApp() {
 
 // Kick it off (only once)
 startApp();
-</script>
+
